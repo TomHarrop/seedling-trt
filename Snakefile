@@ -3,6 +3,7 @@
 import os
 import pathlib
 import pandas
+import shlex
 
 
 #############
@@ -26,6 +27,7 @@ def find_input_files(wildcards):
              for x in my_samples if '_R2_' in x][0]
     return {'r1': my_r1, 'r2': my_r2}
 
+
 ###########
 # GLOBALS #
 ###########
@@ -35,12 +37,14 @@ read_dir = 'data/fastq'
 bbduk_adaptors = 'venv/bin/resources/adapters.fa'
 bbduk_contaminants = 'venv/bin/resources/sequencing_artifacts.fa.gz'
 
+
 #########
 # SETUP #
 #########
 
 # generate name to filename dictionary
 sample_key = pandas.read_csv(sample_key_file)
+
 
 #########
 # RULES #
@@ -52,6 +56,15 @@ rule target:
                treatment=['trt1', 'trt2', 'untreated'],
                rep=['1', '2'],
                r=['1', '2'])
+
+# 3. STAR
+rule map_with_star:
+    input:
+        r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',
+        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq'
+    output:
+        bam = 'output/star/{treatment}_{rep}.bam'
+
 
 # 1. trim and clip with bbduk
 rule trim_clip:
@@ -73,8 +86,8 @@ rule trim_clip:
         'bbduk.sh '
         'threads={threads} '
         '-Xmx100g '
-        'in=\'{input.r1}\' '
-        'in2=\'{input.r2}\' '
+        'in={input.r1} '
+        'in2={input.r2} '
         'out=stdout.fastq '
         'ktrim=r k=23 mink=11 hdist=1 tpe tbo '
         'ref={input.adaptors} '
