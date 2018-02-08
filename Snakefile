@@ -70,12 +70,11 @@ rule trim_clip:
     threads:
         10
     shell:
-        'echo \''
         'bin/bbmap/bbduk.sh '
         'threads={threads} '
         '-Xmx100g '
-        'in={input.r1} '
-        'in2={input.r2} '
+        'in="{input.r1}" '
+        'in2="{input.r2}" '
         'out=stdout.fastq '
         'ktrim=r k=23 mink=11 hdist=1 tpe tbo '
         'ref={input.adaptors} '
@@ -91,5 +90,4 @@ rule trim_clip:
         'ref={input.contaminants} '
         'k=31 hdist=1 stats={log.filter_stats} '
         '2> {log.filter_log}'
-        '\''
 
