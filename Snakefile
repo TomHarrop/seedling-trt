@@ -64,9 +64,9 @@ rule trim_clip:
         r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq'
     log:
         trim_log = 'output/logs/{treatment}_{rep}_trim.log',
-        trim_stats = 'output/logs/{treatment}_{rep}_trim-stats.txt',
+        trim_stats = 'output/trim_clip/{treatment}_{rep}_trim-stats.txt',
         filter_log = 'output/logs/{treatment}_{rep}_filter.log',
-        filter_stats = 'output/logs/{treatment}_{rep}_filter-stats.txt'
+        filter_stats = 'output/trim_clip/{treatment}_{rep}_filter-stats.txt'
     threads:
         10
     shell:
