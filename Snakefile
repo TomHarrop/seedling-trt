@@ -20,9 +20,9 @@ def find_input_files(wildcards):
     my_samples = list(
         sample_key[(sample_key.treatment == my_treatment) &
                    (sample_key.replicate == int(my_rep))]['file_name'])
-    my_r1 = [resolve_path(os.path.join(read_dir, x))
+    my_r1 = [os.path.join(read_dir, x)
              for x in my_samples if '_R1_' in x][0]
-    my_r2 = [resolve_path(os.path.join(read_dir, x))
+    my_r2 = [os.path.join(read_dir, x)
              for x in my_samples if '_R2_' in x][0]
     return {'r1': my_r1, 'r2': my_r2}
 
@@ -73,8 +73,8 @@ rule trim_clip:
         'bbduk.sh '
         'threads={threads} '
         '-Xmx100g '
-        'in="{input.r1}" '
-        'in2="{input.r2}" '
+        'in=\'{input.r1}\' '
+        'in2=\'{input.r2}\' '
         'out=stdout.fastq '
         'ktrim=r k=23 mink=11 hdist=1 tpe tbo '
         'ref={input.adaptors} '
@@ -85,9 +85,11 @@ rule trim_clip:
         'threads={threads} '
         '-Xmx100g '
         'in=stdin.fastq '
+        'interleaved=t '
         'out={output.r1} '
         'out2={output.r2} '
         'ref={input.contaminants} '
         'k=31 hdist=1 stats={log.filter_stats} '
+        'minlength=50 '
         '2> {log.filter_log}'
 
