@@ -70,7 +70,7 @@ rule trim_clip:
     threads:
         10
     shell:
-        'bin/bbmap/bbduk.sh '
+        'bbduk.sh '
         'threads={threads} '
         '-Xmx100g '
         'in="{input.r1}" '
@@ -81,7 +81,7 @@ rule trim_clip:
         'stats={log.trim_stats} '
         'statscolumns=5 '
         '2> {log.trim_log} '
-        '| bin/bbmap/bbduk.sh '
+        '| bbduk.sh '
         'threads={threads} '
         '-Xmx100g '
         'in=stdin.fastq '
