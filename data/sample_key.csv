@@ -1,0 +1,13 @@
+file_name,treatment,replicate
+XMMNO1-Dec17_S75_L001_R1_001.fastq,trt1,1
+XMMNO1-Dec17_S75_L001_R2_001.fastq,trt1,1
+XMMNO2-Dec17_S76_L001_R1_001.fastq,trt1,2
+XMMNO2-Dec17_S76_L001_R2_001.fastq,trt1,2
+XMMNOplusHeat1-Dec17_S77_L001_R1_001.fastq,trt2,1
+XMMNOplusHeat1-Dec17_S77_L001_R2_001.fastq,trt2,1
+XMMNOplusHeat2-Dec17_S78_L001_R1_001.fastq,trt2,2
+XMMNOplusHeat2-Dec17_S78_L001_R2_001.fastq,trt2,2
+XNoMMNO1-Dec17_S73_L001_R1_001.fastq,untreated,1
+XNoMMNO1-Dec17_S73_L001_R2_001.fastq,untreated,1
+XNoMMNO2-Dec17_S74_L001_R1_001.fastq,untreated,2
+XNoMMNO2-Dec17_S74_L001_R2_001.fastq,untreated,2
