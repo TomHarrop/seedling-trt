@@ -36,7 +36,7 @@ sample_key_file = 'data/sample_key.csv'
 read_dir = 'data/fastq'
 bbduk_adaptors = 'venv/bin/resources/adapters.fa'
 bbduk_contaminants = 'venv/bin/resources/sequencing_artifacts.fa.gz'
-
+star_reference_folder = 'output/star_reference'
 
 #########
 # SETUP #
@@ -52,21 +52,36 @@ sample_key = pandas.read_csv(sample_key_file)
 
 rule target:
     input:
-        expand('output/trim_clip/{treatment}_{rep}_r{r}.fastq',
+        expand('output/star_pass1/{treatment}_{rep}.bam',
                treatment=['trt1', 'trt2', 'untreated'],
-               rep=['1', '2'],
-               r=['1', '2'])
+               rep=['1', '2'])
 
-# 3. STAR
-rule map_with_star:
+# 3. map
+# rule star_second_pass:
+#     pass
+
+rule star_first_pass:
     input:
         r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',
-        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq'
+        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq',
+        star_reference = 'output/star_reference/Genome'
     output:
-        bam = 'output/star/{treatment}_{rep}.bam'
+        sjdb = 'output/star_pass1/{treatment}_{rep}.SJ.out.tab'
+    threads:
+        15
+    params:
+        genome_dir = star_reference_folder,
+        prefix = 'output/star_pass1/{treatment}_{rep}.'
+    shell:
+        'STAR '
+        '--runThreadN {threads} '
+        '--genomeDir {params.genome_dir} '
+        '--outSJfilterReads Unique '
+        '--outSAMtype None '
+        '--readFilesIn {input.r1} {input.r2} '
+        '--outFileNamePrefix {params.prefix} '
 
-
-# 1. trim and clip with bbduk
+# 2. trim and clip with bbduk
 rule trim_clip:
     input:
         unpack(find_input_files),
@@ -105,4 +120,28 @@ rule trim_clip:
         'k=31 hdist=1 stats={log.filter_stats} '
         'minlength=50 '
         '2> {log.filter_log}'
+
+# 1. process reference for STAR
+rule star_reference:
+    input:
+        fasta = 'data/ref/TAIR10_Chr.all.fasta',
+        gtf = 'data/ref/Araport11_GFF3_genes_transposons.201606.gtf'
+    output:
+        'output/star_reference/Genome'
+    params:
+        genome_dir = star_reference_folder
+    threads:
+        30
+    log:
+        'output/logs/star_reference.log'
+    shell:
+        'STAR '
+        '--runThreadN {threads} '
+        '--runMode genomeGenerate '
+        '--genomeDir {params.genome_dir} '
+        '--genomeFastaFiles {input.fasta} '
+        '--sjdbGTFfile {input.gtf} '
+        '--sjdbOverhang 149 '
+        '&> {log}'
+
 
