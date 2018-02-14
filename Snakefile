@@ -52,13 +52,41 @@ sample_key = pandas.read_csv(sample_key_file)
 
 rule target:
     input:
-        expand('output/star_pass1/{treatment}_{rep}.bam',
+        expand('output/star_pass2/{treatment}_{rep}.Aligned.out.bam',
                treatment=['trt1', 'trt2', 'untreated'],
                rep=['1', '2'])
 
 # 3. map
-# rule star_second_pass:
-#     pass
+rule star_second_pass:
+    input:
+        r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',
+        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq',
+        star_reference = 'output/star_reference/Genome',
+        junctions = expand(
+            expand('output/star_pass1/{treatment}_{rep}.SJ.out.tab',
+                   treatment=['trt1', 'trt2', 'untreated'],
+                   rep=['1', '2']))
+    output:
+        bam = 'output/star_pass2/{treatment}_{rep}.Aligned.out.bam',
+        counts = 'output/star_pass2/{treatment}_{rep}.ReadsPerGene.out.tab'
+    threads:
+        15
+    params:
+        genome_dir = star_reference_folder,
+        prefix = 'output/star_pass2/{treatment}_{rep}.'
+    log:
+        'output/logs/STAR_pass2_{treatment}_{rep}.log'
+    shell:
+        'STAR '
+        '--runThreadN {threads} '
+        '--genomeDir {params.genome_dir} '
+        '--sjdbFileChrStartEnd {input.junctions} '
+        '--outSAMtype BAM SortedByCoordinate '
+        '--outBAMcompression 10 '
+        '--quantMode GeneCounts '
+        '--readFilesIn {input.r1} {input.r2} '
+        '--outFileNamePrefix {params.prefix} '
+        '&> {log}'
 
 rule star_first_pass:
     input:
@@ -72,6 +100,8 @@ rule star_first_pass:
     params:
         genome_dir = star_reference_folder,
         prefix = 'output/star_pass1/{treatment}_{rep}.'
+    log:
+        'output/logs/STAR_pass1_{treatment}_{rep}.log'
     shell:
         'STAR '
         '--runThreadN {threads} '
@@ -80,6 +110,7 @@ rule star_first_pass:
         '--outSAMtype None '
         '--readFilesIn {input.r1} {input.r2} '
         '--outFileNamePrefix {params.prefix} '
+        '&> {log}'
 
 # 2. trim and clip with bbduk
 rule trim_clip:
