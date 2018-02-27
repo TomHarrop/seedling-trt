@@ -53,7 +53,7 @@ sample_key = pandas.read_csv(sample_key_file)
 rule target:
     input:
         expand(('output/star_pass2/'
-                '{treatment}_{rep}.Aligned.sortedByCoord.out.bam.bai'),
+                '{treatment}_{rep}.Aligned.sortedByCoord.out.bam'),
                treatment=['trt1', 'trt2', 'untreated'],
                rep=['1', '2'])
 
@@ -61,7 +61,7 @@ rule target:
 rule plot_counts_stats:
     input:
         bam_files = expand(('output/star_pass2/'
-                '{treatment}_{rep}.Aligned.sortedByCoord.out.bam.bai'),
+                '{treatment}_{rep}.Aligned.sortedByCoord.out.bam'),
                treatment=['trt1', 'trt2', 'untreated'],
                rep=['1', '2']),
         gff = 'data/ref/Araport11_GFF3_genes_transposons.201606.gff'
@@ -69,6 +69,8 @@ rule plot_counts_stats:
         counts_plot = 'output/mapping_stats/counts_per_category.pdf',
         intron_exon_plot = 'output/mapping_stats/intron_exon_counts.pdf',
         feature_counts = 'output/mapping_stats/feature_counts.csv'
+    log:
+        log = 'output/logs/plot_counts_stats.log'
     threads:
         6
     script:
@@ -76,19 +78,6 @@ rule plot_counts_stats:
 
 
 # 3. map
-rule index_bam_files:
-    input:
-        ('output/star_pass2/'
-         '{treatment}_{rep}.Aligned.sortedByCoord.out.bam')
-    output:
-        ('output/star_pass2/'
-         '{treatment}_{rep}.Aligned.sortedByCoord.out.bam.bai')
-    threads:
-        1
-    shell:
-        'samtools index {input} {output}'
-
-
 rule star_second_pass:
     input:
         r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',

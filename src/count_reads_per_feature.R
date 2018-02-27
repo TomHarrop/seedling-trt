@@ -13,6 +13,8 @@ library(systemPipeR)
 # FUNCTIONS #
 #############
 
+FirstElement <- function(y){unlist(y)[1][1]}
+
 ReadCountWrapper <- function(features,
                              bamfile_list) {
     my_counts <- GenomicAlignments::summarizeOverlaps(
@@ -22,11 +24,14 @@ ReadCountWrapper <- function(features,
         singleEnd = FALSE,
         ignore.strand = TRUE,
         fragments = FALSE)
-    data.table(
-        as.data.table(rowData(my_counts)),
-        assay(my_counts))
+    my_rd <- rowData(my_counts)
+    my_unlisted_rd_list <- lapply(seq_len(ncol(my_rd)), function(i)
+        sapply(my_rd[,i], FirstElement))
+    names(my_unlisted_rd_list) <- names(my_rd)
+    my_unlisted_rd <- data.table(do.call(cbind, my_unlisted_rd_list))
+    data.table(my_unlisted_rd,
+               data.table(assay(my_counts)))
 }
-
 
 ###########
 # GLOBALS #
@@ -41,13 +46,13 @@ cpus <- snakemake@threads[[1]]
 log_file <- snakemake@log[["log"]]
 
 
-# cpus <- 8
+# cpus <- 6
 # gff_file = "data/ref/Araport11_GFF3_genes_transposons.201606.gff"
 # bamfile_list <- c("output/star_pass2/trt1_1.Aligned.sortedByCoord.out.bam",
-#                   "output/star_pass2/trt1_2.Aligned.sortedByCoord.out.bam", 
+#                   "output/star_pass2/trt1_2.Aligned.sortedByCoord.out.bam",
 #                   "output/star_pass2/trt2_1.Aligned.sortedByCoord.out.bam",
-#                   "output/star_pass2/trt2_2.Aligned.sortedByCoord.out.bam", 
-#                   "output/star_pass2/untreated_1.Aligned.sortedByCoord.out.bam", 
+#                   "output/star_pass2/trt2_2.Aligned.sortedByCoord.out.bam",
+#                   "output/star_pass2/untreated_1.Aligned.sortedByCoord.out.bam",
 #                   "output/star_pass2/untreated_2.Aligned.sortedByCoord.out.bam")
 # plot1_file <- "counts_per_category.pdf"
 # plot2_file <- "intron_exon_counts.pdf"
@@ -113,8 +118,7 @@ intergenic <- genFeatures(nuclear_txdb_with_rrna,
 feature_list <- list(exons = nuc_exons,
                      introns = nuc_introns,
                      mitochondrion = mito_exons,
-                     chloroplast = chl
-                     _exons,
+                     chloroplast = chl_exons,
                      intergenic = intergenic,
                      ribosome = ribo_gff)
 
@@ -154,9 +158,9 @@ plot1 <- ggplot(
 # INTRONIC VS EXONIC READS PER GENE 
 exonic_intronic_long <- feature_counts_long[feature %in% c("exons", "introns")]
 exonic_intronic <- dcast(exonic_intronic_long,
-      gene_id + sample_name ~ feature,
-      fun.aggregate = sum,
-      value.var = "counts")
+                         gene_id + sample_name ~ feature,
+                         fun.aggregate = sum,
+                         value.var = "counts")
 plot2 <- ggplot(exonic_intronic, aes(x = exons, y = introns)) +
     facet_wrap(~ sample_name) +
     scale_x_log10() +
