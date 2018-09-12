@@ -13,18 +13,25 @@ import shlex
 def resolve_path(my_path):
     return str(pathlib.Path(my_path).resolve())
 
+# find acceptable combos from sample_key
+def find_combos(sample_key, experiment):
+    my_key = sample_key[sample_key['experiment'] == experiment]
+    my_samples = sorted(set(my_key['sample']))
+    my_replicates = sorted(set(my_key['replicate']))
+    return({'samples': my_samples,
+            'replicates': my_replicates})
 
 # def find_input_files(wildcards):
 def find_input_files(wildcards):
-    my_treatment = wildcards.treatment
-    my_rep = wildcards.rep
-    my_samples = list(
-        sample_key[(sample_key.treatment == my_treatment) &
-                   (sample_key.replicate == int(my_rep))]['file_name'])
-    my_r1 = [os.path.join(read_dir, x)
-             for x in my_samples if '_R1_' in x][0]
-    my_r2 = [os.path.join(read_dir, x)
-             for x in my_samples if '_R2_' in x][0]
+    my_experiment = wildcards.experiment
+    my_sample = wildcards.sample
+    my_replicate = wildcards.replicate
+    my_key = sample_key[
+        (sample_key['experiment'] == my_experiment) &
+        (sample_key['sample'] == my_sample) &
+        (sample_key['replicate'] == my_replicate)]
+    my_r1 = my_key.iloc[0]['r1_rel_path']
+    my_r2 = my_key.iloc[0]['r2_rel_path']
     return {'r1': my_r1, 'r2': my_r2}
 
 
@@ -34,17 +41,29 @@ def find_input_files(wildcards):
 
 sample_key_file = 'data/sample_key.csv'
 read_dir = 'data/fastq'
-bbduk_adaptors = 'venv/bin/resources/adapters.fa'
-bbduk_contaminants = 'venv/bin/resources/sequencing_artifacts.fa.gz'
+bbduk_adaptors = '/adapters.fa'                     # in the bbmap container
+bbduk_contaminants = '/sequencing_artifacts.fa.gz'  # in the bbmap container
 star_reference_folder = 'output/star_reference'
+
+# containers
+bbduk_container = ('shub://TomHarrop/singularity-containers:bbmap_38.00'
+                   '@a773baa8cc025cc5b5cbee20e507fef7')
+star_container = ('shub://TomHarrop/singularity-containers:star_2.6.0c'
+                  '@eaa90a258fdb26b6b0ce7d07246ffe2c')
+bioc_container = ('shub://TomHarrop/singularity-containers:bioconductor_3.7'
+                  '@2785c89cc4ef1cbb08c06dde9ecf9544')
+
+
 
 #########
 # SETUP #
 #########
 
-# generate name to filename dictionary
+# read the sample key
 sample_key = pandas.read_csv(sample_key_file)
 
+# get all experiments
+all_expts = sorted(set(sample_key['experiment']))
 
 #########
 # RULES #
@@ -52,52 +71,57 @@ sample_key = pandas.read_csv(sample_key_file)
 
 rule target:
     input:
-        expand(('output/star_pass2/'
-                '{treatment}_{rep}.Aligned.sortedByCoord.out.bam'),
-               treatment=['trt1', 'trt2', 'untreated'],
-               rep=['1', '2'])
+        expand('output/mapping_stats/{experiment}/feature_counts.csv',
+               experiment=all_expts)
 
-# 4. plots
+# # 4. plots
 rule plot_counts_stats:
     input:
-        bam_files = expand(('output/star_pass2/'
-                '{treatment}_{rep}.Aligned.sortedByCoord.out.bam'),
-               treatment=['trt1', 'trt2', 'untreated'],
-               rep=['1', '2']),
+        bam_files = lambda wildcards: expand(
+            ('output/star_pass2/{0}/{{sample}}_{{replicate}}.'
+             'Aligned.sortedByCoord.out.bam').format(wildcards.experiment),
+            sample=find_combos(sample_key, wildcards.experiment)['samples'],
+            replicate=find_combos(sample_key, wildcards.experiment)['replicates']),
         gff = 'data/ref/Araport11_GFF3_genes_transposons.201606.gff'
     output:
-        counts_plot = 'output/mapping_stats/counts_per_category.pdf',
-        intron_exon_plot = 'output/mapping_stats/intron_exon_counts.pdf',
-        feature_counts = 'output/mapping_stats/feature_counts.csv'
+        counts_plot = 'output/mapping_stats/{experiment}/counts_per_category.pdf',
+        intron_exon_plot = 'output/mapping_stats/{experiment}/intron_exon_counts.pdf',
+        feature_counts = 'output/mapping_stats/{experiment}/feature_counts.csv'
     log:
-        log = 'output/logs/plot_counts_stats.log'
+        log = 'output/logs/plot_counts_stats_{experiment}.log'
     threads:
-        6
+        10
+    singularity:
+        bioc_container
     script:
         'src/count_reads_per_feature.R'
 
 
-# 3. map
+# # 3. map
 rule star_second_pass:
     input:
-        r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',
-        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq',
+        r1 = 'output/trim_clip/{experiment}/{sample}_{replicate}_r1.fastq',
+        r2 = 'output/trim_clip/{experiment}/{sample}_{replicate}_r2.fastq',
         star_reference = 'output/star_reference/Genome',
-        junctions = expand(
-            expand('output/star_pass1/{treatment}_{rep}.SJ.out.tab',
-                   treatment=['trt1', 'trt2', 'untreated'],
-                   rep=['1', '2']))
+        junctions = lambda wildcards: expand(
+            ('output/star_pass1/{0}/{{sample}}_{{replicate}}.'
+             'SJ.out.tab').format(wildcards.experiment),
+            sample=find_combos(sample_key, wildcards.experiment)['samples'],
+            replicate=find_combos(sample_key, wildcards.experiment)['replicates'])
     output:
-        bam = ('output/star_pass2/'
-               '{treatment}_{rep}.Aligned.sortedByCoord.out.bam'),
-        counts = 'output/star_pass2/{treatment}_{rep}.ReadsPerGene.out.tab'
+        bam = 'output/star_pass2/{experiment}/{sample}_{replicate}.Aligned.sortedByCoord.out.bam',
+        counts = 'output/star_pass2/{experiment}/{sample}_{replicate}.ReadsPerGene.out.tab'
     threads:
-        15
+        30
     params:
         genome_dir = star_reference_folder,
-        prefix = 'output/star_pass2/{treatment}_{rep}.'
+        prefix = 'output/star_pass2/{experiment}/{sample}_{replicate}.'
     log:
-        'output/logs/STAR_pass2_{treatment}_{rep}.log'
+        'output/logs/STAR_pass2_{experiment}_{sample}_{replicate}.log'
+    priority:
+        1
+    singularity:
+        star_container
     shell:
         'STAR '
         '--runThreadN {threads} '
@@ -113,18 +137,20 @@ rule star_second_pass:
 
 rule star_first_pass:
     input:
-        r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',
-        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq',
+        r1 = 'output/trim_clip/{experiment}/{sample}_{replicate}_r1.fastq',
+        r2 = 'output/trim_clip/{experiment}/{sample}_{replicate}_r2.fastq',
         star_reference = 'output/star_reference/Genome'
     output:
-        sjdb = 'output/star_pass1/{treatment}_{rep}.SJ.out.tab'
+        sjdb = 'output/star_pass1/{experiment}/{sample}_{replicate}.SJ.out.tab'
     threads:
-        15
+        30
     params:
         genome_dir = star_reference_folder,
-        prefix = 'output/star_pass1/{treatment}_{rep}.'
+        prefix = 'output/star_pass1/{experiment}/{sample}_{replicate}.'
     log:
-        'output/logs/STAR_pass1_{treatment}_{rep}.log'
+        'output/logs/STAR_pass1/{experiment}_{sample}_{replicate}.log'
+    singularity:
+        star_container
     shell:
         'STAR '
         '--runThreadN {threads} '
@@ -139,18 +165,21 @@ rule star_first_pass:
 rule trim_clip:
     input:
         unpack(find_input_files),
+    output:
+        r1 = 'output/trim_clip/{experiment}/{sample}_{replicate}_r1.fastq',
+        r2 = 'output/trim_clip/{experiment}/{sample}_{replicate}_r2.fastq'
+    params:
         adaptors = bbduk_adaptors,
         contaminants = bbduk_contaminants
-    output:
-        r1 = 'output/trim_clip/{treatment}_{rep}_r1.fastq',
-        r2 = 'output/trim_clip/{treatment}_{rep}_r2.fastq'
     log:
-        trim_log = 'output/logs/{treatment}_{rep}_trim.log',
-        trim_stats = 'output/trim_clip/{treatment}_{rep}_trim-stats.txt',
-        filter_log = 'output/logs/{treatment}_{rep}_filter.log',
-        filter_stats = 'output/trim_clip/{treatment}_{rep}_filter-stats.txt'
+        trim_log = 'output/logs/{experiment}_{sample}_{replicate}_trim.log',
+        trim_stats = 'output/trim_clip/{experiment}/{sample}_{replicate}_trim-stats.txt',
+        filter_log = 'output/logs/{experiment}_{sample}_{replicate}_filter.log',
+        filter_stats = 'output/trim_clip/{experiment}/{sample}_{replicate}_filter-stats.txt'
     threads:
-        10
+        2
+    singularity:
+        bbduk_container
     shell:
         'bbduk.sh '
         'threads={threads} '
@@ -159,7 +188,7 @@ rule trim_clip:
         'in2={input.r2} '
         'out=stdout.fastq '
         'ktrim=r k=23 mink=11 hdist=1 tpe tbo '
-        'ref={input.adaptors} '
+        'ref={params.adaptors} '
         'stats={log.trim_stats} '
         'statscolumns=5 '
         '2> {log.trim_log} '
@@ -170,7 +199,7 @@ rule trim_clip:
         'interleaved=t '
         'out={output.r1} '
         'out2={output.r2} '
-        'ref={input.contaminants} '
+        'ref={params.contaminants} '
         'k=31 hdist=1 stats={log.filter_stats} '
         'minlength=50 '
         '2> {log.filter_log}'
@@ -188,6 +217,8 @@ rule star_reference:
         30
     log:
         'output/logs/star_reference.log'
+    singularity:
+        star_container
     shell:
         'STAR '
         '--runThreadN {threads} '
