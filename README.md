@@ -1,6 +1,6 @@
 ## seedling-trt
 
-Analysis of Mg^2+^ and MMNO effects for Chakkatu *et al*., 2018.
+Analysis of Mg<sup>2+</sup> and MMNO effects for Chakkatu *et al*., 2018.
 
 ### Requirements
 
