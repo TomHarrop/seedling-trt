@@ -84,8 +84,6 @@ rule plot_counts_stats:
             replicate=find_combos(sample_key, wildcards.experiment)['replicates']),
         gff = 'data/ref/Araport11_GFF3_genes_transposons.201606.gff'
     output:
-        counts_plot = 'output/mapping_stats/{experiment}/counts_per_category.pdf',
-        intron_exon_plot = 'output/mapping_stats/{experiment}/intron_exon_counts.pdf',
         feature_counts = 'output/mapping_stats/{experiment}/feature_counts.csv'
     log:
         log = 'output/logs/plot_counts_stats_{experiment}.log'
